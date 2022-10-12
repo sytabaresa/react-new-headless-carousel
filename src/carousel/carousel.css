@@ -1,0 +1,21 @@
+
+.carousel {
+    display: flex;
+    position: relative;
+    overflow-x: auto;
+    /* scroll-snap-type: x mandatory; */
+    /* scroll-behavior: smooth; */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.carousel-item {
+    box-sizing: content-box;
+    display: flex;
+    flex: none;
+    /* scroll-snap-align: start; */
+}
