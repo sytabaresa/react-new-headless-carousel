@@ -8,10 +8,17 @@ type Interatorfn = (current: number, active: boolean) => React.ReactNode
 
 const log = console.log
 
-export const useCarousel = () => {
+export interface useCarouselOptions {
+    itemsToScroll?: number;
+}
+
+export const useCarousel = (options: useCarouselOptions = {}) => {
+
+    const { itemsToScroll = 1 } = options
+
     const [pressed, setPressed] = useState(false)
-    const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
     const [scrolling, setScrolling] = useState(false)
+    const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
 
     const [iteratorFn, setInteratorFn] = useState<{ fn: Interatorfn }>({ fn: (c, a) => null })
 
@@ -121,10 +128,18 @@ export const useCarousel = () => {
 
     const scrollTo = (n: number) => {
         const sections = targetRef.current.children
-        if (targetRef.current && n > 0 && sections[n]) {
+        if (targetRef.current && n >= 0 && sections[n]) {
             log("go to item " + n)
             animateScrollTo(sections[n], { elementToScroll: targetRef.current })
         }
+    }
+
+    const scrollNext = () => {
+        scrollTo(current + 1)
+    }
+
+    const scrollPrev = () => {
+        scrollTo(current - 1)
     }
 
     const useInfinite = (fn: Interatorfn, preload: number = 1): React.ReactNode[] => {
@@ -141,5 +156,5 @@ export const useCarousel = () => {
         return sections!
     }
 
-    return { handlers, current, scrollTo, useInfinite, sections }
+    return { handlers, current, scrollTo, useInfinite, sections, scrollNext, scrollPrev }
 }

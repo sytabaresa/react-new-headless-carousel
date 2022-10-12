@@ -5,20 +5,17 @@ import {
     eventCallback,
     EventsAddon,
 } from '@vitebook/preact/addons';
-import { JSXInternal } from 'react';
-import { useState, useEffect } from 'react';
-import { children } from 'svelte/internal';
+import { useState, useEffect, JSXInternal } from 'react';
 import { useCarousel } from './useCarousel';
 import './carousel.css'
-import animateScrollTo from 'animated-scroll-to';
 
 export const __pageMeta: PageMeta = {
-    title: 'Carousel',
-    description: 'My awesome carousel.',
+    title: 'Infinite Carousel',
+    description: 'My awesome infinite carousel.',
 };
 
 function CarouselStory() {
-    const { handlers, current, scrollTo, useInfinite } = useCarousel()
+    const { handlers, current, scrollTo, scrollNext, scrollPrev, useInfinite } = useCarousel()
     const [_current, setCurrent] = useState(0)
 
 
@@ -32,6 +29,10 @@ function CarouselStory() {
         </div>
     )
 
+    const generator = () =>
+    <div className="carousel-item w-full h-40">
+                            <ExampleElement n={i + 1} />
+                        </div>
     const range = (i: number) => [...Array(i).keys()]
 
     return (
@@ -42,14 +43,10 @@ function CarouselStory() {
                     className="carousel w-40"
                     {...handlers}
                 >
-                    {range(6).map(i =>
-                        <div className="carousel-item w-full h-40">
-                            <ExampleElement n={i + 1} />
-                        </div>
-                    )}
-
+                    
                 </div>
             </Variant>
+           
             <ControlsAddon>
                 <label>
                     Current
