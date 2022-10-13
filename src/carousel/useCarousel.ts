@@ -7,7 +7,7 @@ export interface useCarouselOptions {
 
 export const useCarousel = (options: useCarouselOptions = {}) => {
 
-    const { debug = true } = options
+    const { debug = false } = options
     const log = debug ? console.log : (a: any) => null
 
     // maybe if complexity grows (more 'flags') a FSM should be a good idea
@@ -46,12 +46,14 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     }, [_current, pressed])
 
     useEffect(() => {
-        const sections = targetRef.current.children
+        const sections = targetRef?.current?.children
         if (stopScrolling) {
+            setStopScrolling(false)
+
+            // this don't like me, I miss FSMs :'v
             if ((infinite && _current != sections.length - 1 && _current != 0) || !infinite) {
                 log('stop scrolling')
                 _scrollTo(_current, sections)
-                setStopScrolling(false)
             }
         }
 
@@ -64,7 +66,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     }
 
     const handlers = {
-        ref: targetRef,
+        ref: targetRef, //BUG: this not resolve on refresh/cache/unmount, needs unmount logic? (?)
         onMouseDown: (e: any) => {
             setPos({
                 // The current scroll
@@ -95,7 +97,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             e.currentTarget.scrollLeft = pos.left - dx;
         },
         onMouseOut: (e: any) => {
-            log('out')
+            // log('out event')
             noSelect(e)
             setStopScrolling(true)
         },
@@ -138,7 +140,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     }
 
     const scrollTo = (n: number, options = {}) => {
-        const sections = targetRef.current.children
+        const sections = targetRef?.current?.children
         if (infinite) _scrollTo(n, [...sections].slice(1, sections.length - 1))
         else _scrollTo(n, sections)
     }
@@ -177,9 +179,9 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
         slidesWithClones.push(slidesWithClones[1])
 
         useEffect(() => {
-            console.log('inf')
+            console.log('infinite mode')
             setInfinite(true)
-            const sections = targetRef.current.children
+            const sections = targetRef?.current?.children
 
             _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
         }, [])
