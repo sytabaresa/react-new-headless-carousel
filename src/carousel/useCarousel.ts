@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react"
 import animateScrollTo from 'animated-scroll-to';
 
-export interface useCarouselOptions {
+interface useCarouselOptions {
     debug?: boolean;
 }
 
