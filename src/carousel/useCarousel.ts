@@ -29,10 +29,10 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
 
         if (infinite && !pressed) {
             const sections = targetRef.current.children
-            if (_current == sections.length - _preload) {
+            if (_current == sections.length - 2*_preload+1) {
                 log('go init')
                 setTimeout(() => {
-                    _scrollTo(_preload, sections, { maxDuration: 0, minDuration: 0 })
+                    _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
                 }, 100)
             }
 
@@ -180,12 +180,12 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
         slidesWithClones.push(...slidesWithClones.slice(preload, 2 * preload))
 
         useEffect(() => {
-            console.log('infinite mode')
+            log('infinite mode')
             setInfinite(true)
             setPreload(preload)
             const sections = targetRef?.current?.children
 
-            _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
+            _scrollTo(preload, sections, { maxDuration: 0, minDuration: 0 })
         }, [])
         return slidesWithClones
     }

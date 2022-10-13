@@ -20,19 +20,19 @@ function CarouselStory() {
     // const { handlers, current, scrollTo, scrollNext, scrollPrev, useInfinite } = useCarousel()
     const [_current, setCurrent] = useState(0)
 
-    const { handlers, scrollNext, scrollPrev, scrollTo, current, useInfinite } = useCarousel()
+    const { handlers, scrollNext, scrollPrev, scrollTo, current, useInfinite } = useCarousel({ debug: true })
 
     useEffect(() => {
         scrollTo(_current)
     }, [_current])
 
     const items = range(5).map(i =>
-        <div className="carousel-item w-40 h-40 m-2">
+        <div className="carousel-item w-20 h-20 m-2">
             <ExampleElement n={i + 1} />
         </div>
     )
 
-    const slides = useInfinite(items, 3)
+    const slides = useInfinite(items, 6)
 
 
     return (
@@ -45,7 +45,7 @@ function CarouselStory() {
                             onClick={() => scrollPrev()}
                         >{"<"}</div>
                         <div
-                            className="carousel w-[32rem]"
+                            className="carousel w-[34rem]"
                             {...handlers}
                         >
                             {/* {items} */}
