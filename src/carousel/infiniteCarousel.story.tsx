@@ -39,7 +39,6 @@ function CarouselStory() {
         <>
             <Variant name="Single Item" description="Single Item carousel">
                 <div
-                    id="test-carousel"
                     className="carousel w-40"
                     {...handlers}
                 >

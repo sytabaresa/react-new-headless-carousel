@@ -78,6 +78,7 @@ function CarouselStory() {
             scrollTo(current)
         }, [current])
 
+        console.log('ree')
         const items = range(5).map(i =>
             <div className="carousel-item w-full h-40 m-2">
                 <ExampleElement n={i + 1} />

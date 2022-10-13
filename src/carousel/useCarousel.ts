@@ -1,31 +1,22 @@
-import React, { HTMLAttributes, useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import animateScrollTo from 'animated-scroll-to';
 
-// import { range } from "lodash"
-const range = (i: number) => [...Array(i).keys()]
-
-type Interatorfn = (current: number, active: boolean) => React.ReactNode
-
-const log = console.log
-
 export interface useCarouselOptions {
-    itemsToScroll?: number;
+    debug?: boolean;
 }
 
 export const useCarousel = (options: useCarouselOptions = {}) => {
 
-    const { itemsToScroll = 1 } = options
+    const { debug = true } = options
+    const log = debug ? console.log : (a: any) => null
 
+    const [infinite, setInfinite] = useState(false)
     const [pressed, setPressed] = useState(false)
     const [scrolling, setScrolling] = useState(false)
     const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
 
-    const [iteratorFn, setInteratorFn] = useState<{ fn: Interatorfn }>({ fn: (c, a) => null })
-
-    const [_preload, setPreload] = useState(0)
-
-    const [current, setCurrent] = useState(0)
-    const [sections, setSections] = useState<React.ReactNode[]>()
+    const [_current, setCurrent] = useState(0)
+    const current = infinite ? _current - 1 : _current
 
     const targetRef = useRef<any>(null)
     const [pos, setPos] = useState({ top: 0, left: 0, x: 0, y: 0 })
@@ -33,15 +24,29 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     useEffect(() => {
         log("current " + current)
 
-        //     console.log(current, iteratorFn, sections)
-        //     const sects = range(_preload).map((i) => iteratorFn.fn(i, current == i))
-        //     setSections(sects)
-    }, [current])
+        if (infinite) {
+            const sections = targetRef.current.children
+            if (_current == sections.length - 1) {
+                log('go init')
+                setTimeout(() => {
+                    _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
+                }, 100)
+            }
 
+            if (_current == 0) {
+                log('go end')
+                setTimeout(() => {
+                    _scrollTo(sections.length - 2, sections, { maxDuration: 0, minDuration: 0 })
+                }, 100)
+            }
+
+        }
+    }, [_current])
 
     useEffect(() => {
-        if (scrolling) {
-            scrollTo(current)
+        const sections = targetRef.current.children
+        if (scrolling && !infinite && (_current != sections.length - 1) && (_current != 0))  {
+            _scrollTo(_current, sections)
             setScrolling(false)
         }
 
@@ -70,7 +75,8 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
         },
         onMouseUp: (e: any) => {
             noSelect(e)
-            scrollTo(current)
+            const sections = targetRef.current.children
+            _scrollTo(_current, sections)
         },
         onMouseMove: (e: any) => {
             if (!pressed) return
@@ -79,7 +85,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             const dy = e.clientY - pos.y;
 
             // Scroll the element
-            // console.log(dx, dy)
+            // log(dx, dy)
             e.currentTarget.scrollTop = pos.top - dy;
             e.currentTarget.scrollLeft = pos.left - dx;
         },
@@ -108,53 +114,71 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             for (let i = 0, l = sections.length; i < l; i++) {
                 let relativePos = sections[i].offsetLeft + sections[i].offsetWidth - posLeft
 
-                // log("scroll", i, sections[i].offsetLeft, posLeft, relativePos, sections[i].offsetWidth)
                 // Check if the point we found falls within the section
                 if (relativePos >= 0 && relativePos > (sections[i].offsetWidth / 2)) {
                     setCurrent(i)
                     break;
                 }
             }
-
-            // console.log(e.currentTarget.scrollLeft, e.currentTarget.clientWidth, e.currentTarget.scrollWidth)
-            // if (iteratorFn && e.currentTarget.scrollLeft + e.currentTarget.clientWidth >= e.currentTarget.scrollWidth * 0.7) {
-            //     setPreload(p => {
-            //         setSections(range(p + 1).map((i) => iteratorFn.fn(i, current == i)))
-            //         return p + 1
-            //     })
-            // }
         },
     }
 
-    const scrollTo = (n: number) => {
-        const sections = targetRef.current.children
-        if (targetRef.current && n >= 0 && sections[n]) {
+    const _scrollTo = (n: number, sections, options = {}) => {
+        // console.log(options)
+        if (targetRef.current && n >= 0 && n < sections.length) {
             log("go to item " + n)
-            animateScrollTo(sections[n], { elementToScroll: targetRef.current })
+            animateScrollTo(sections[n], { elementToScroll: targetRef.current, ...options })
         }
     }
 
+    const scrollTo = (n: number, options = {}) => {
+        const sections = targetRef.current.children
+        if (infinite) _scrollTo(n, [...sections].slice(1, sections.length - 1))
+        else _scrollTo(n, sections)
+    }
+
     const scrollNext = () => {
-        scrollTo(current + 1)
+        const sections = targetRef.current.children
+        _scrollTo(_current + 1, sections)
     }
 
     const scrollPrev = () => {
-        scrollTo(current - 1)
+        const sections = targetRef.current.children
+        _scrollTo(_current - 1, sections)
     }
 
-    const useInfinite = (fn: Interatorfn, preload: number = 1): React.ReactNode[] => {
+    // TODO: support generator function
+    // type Interatorfn = (current: number, active: boolean) => React.ReactNode
+    // const [iteratorFn, setInteratorFn] = useState<{ fn: Interatorfn }>({ fn: (c, a) => null })
+    // const [_preload, setPreload] = useState(0)
+    // const useInfinite = (fn: Interatorfn, preload: number = 1): React.ReactNode[] => {
+    //     useEffect(() => {
+    //         const sects = range(preload).map((i) => fn(i, current == i))
+    //         scrollTo(0)
+    //         setInteratorFn({ fn })
+    //         setPreload(preload)
+    //         setSections(sects)
+
+    //         // console.log('inf1')
+    //     }, [])
+
+    //     return sections!
+    // }
+
+    const useInfinite = (slides: React.ReactNode[]): React.ReactNode[] => {
+        const slidesWithClones = [...slides]
+        slidesWithClones.unshift(slidesWithClones[slidesWithClones.length - 1])
+        slidesWithClones.push(slidesWithClones[1])
+
         useEffect(() => {
-            const sects = range(preload).map((i) => fn(i, current == i))
-            scrollTo(0)
-            setInteratorFn({ fn })
-            setPreload(preload)
-            setSections(sects)
+            console.log('inf')
+            setInfinite(true)
+            const sections = targetRef.current.children
 
-            // console.log('inf1')
+            _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
         }, [])
-
-        return sections!
+        return slidesWithClones
     }
 
-    return { handlers, current, scrollTo, useInfinite, sections, scrollNext, scrollPrev }
+    return { handlers, current, scrollTo, useInfinite, scrollNext, scrollPrev }
 }
