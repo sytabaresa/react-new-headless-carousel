@@ -12,8 +12,8 @@ export default defineConfig<DefaultThemeConfig>({
     defaultThemePlugin(),
   ],
   site: {
-    title: 'React Headless Carousel',
-    description: '',
+    title: 'React New Headless Carousel',
+    description: 'a lightweight and simple hooks based headless api for make carousel',
     theme: {},
   },
 });
