@@ -10,9 +10,11 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     const { debug = true } = options
     const log = debug ? console.log : (a: any) => null
 
+    // maybe if complexity grows (more 'flags') a FSM should be a good idea
     const [infinite, setInfinite] = useState(false)
     const [pressed, setPressed] = useState(false)
-    const [scrolling, setScrolling] = useState(false)
+    const [stopScrolling, setStopScrolling] = useState(false)
+
     const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
 
     const [_current, setCurrent] = useState(0)
@@ -24,7 +26,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     useEffect(() => {
         log("current " + current)
 
-        if (infinite) {
+        if (infinite && !pressed) {
             const sections = targetRef.current.children
             if (_current == sections.length - 1) {
                 log('go init')
@@ -41,16 +43,19 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             }
 
         }
-    }, [_current])
+    }, [_current, pressed])
 
     useEffect(() => {
         const sections = targetRef.current.children
-        if (scrolling && !infinite && (_current != sections.length - 1) && (_current != 0))  {
-            _scrollTo(_current, sections)
-            setScrolling(false)
+        if (stopScrolling) {
+            if ((infinite && _current != sections.length - 1 && _current != 0) || !infinite) {
+                log('stop scrolling')
+                _scrollTo(_current, sections)
+                setStopScrolling(false)
+            }
         }
 
-    }, [scrolling])
+    }, [stopScrolling])
 
     const noSelect = (e: any) => {
         setPressed(false)
@@ -89,8 +94,10 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             e.currentTarget.scrollTop = pos.top - dy;
             e.currentTarget.scrollLeft = pos.left - dx;
         },
-        onBlur: (e: any) => {
+        onMouseOut: (e: any) => {
+            log('out')
             noSelect(e)
+            setStopScrolling(true)
         },
         onScroll: (e: any) => {
 
@@ -101,8 +108,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             setScrollingTimer({
                 s: setTimeout(function () {
                     // Run the callback
-                    log('stop scrolling')
-                    setScrolling(true)
+                    setStopScrolling(true)
                 }, 66)
             })
 
