@@ -18,6 +18,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
 
     const [_current, setCurrent] = useState(0)
+    const [_preload, setPreload] = useState(1)
     const current = infinite ? _current - 1 : _current
 
     const targetRef = useRef<any>(null)
@@ -28,17 +29,17 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
 
         if (infinite && !pressed) {
             const sections = targetRef.current.children
-            if (_current == sections.length - 1) {
+            if (_current == sections.length - _preload) {
                 log('go init')
                 setTimeout(() => {
-                    _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
+                    _scrollTo(_preload, sections, { maxDuration: 0, minDuration: 0 })
                 }, 100)
             }
 
             if (_current == 0) {
                 log('go end')
                 setTimeout(() => {
-                    _scrollTo(sections.length - 2, sections, { maxDuration: 0, minDuration: 0 })
+                    _scrollTo(sections.length - 2*_preload, sections, { maxDuration: 0, minDuration: 0 })
                 }, 100)
             }
 
@@ -173,14 +174,15 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     //     return sections!
     // }
 
-    const useInfinite = (slides: React.ReactNode[]): React.ReactNode[] => {
+    const useInfinite = (slides: React.ReactNode[], preload = 1): React.ReactNode[] => {
         const slidesWithClones = [...slides]
-        slidesWithClones.unshift(slidesWithClones[slidesWithClones.length - 1])
-        slidesWithClones.push(slidesWithClones[1])
+        slidesWithClones.unshift(...slidesWithClones.slice(slidesWithClones.length - preload, slidesWithClones.length))
+        slidesWithClones.push(...slidesWithClones.slice(preload, 2 * preload))
 
         useEffect(() => {
             console.log('infinite mode')
             setInfinite(true)
+            setPreload(preload)
             const sections = targetRef?.current?.children
 
             _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
