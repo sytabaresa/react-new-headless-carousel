@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react"
 import animateScrollTo from 'animated-scroll-to';
 // import 'robot3/debug';
-import 'robot3/logging';
+// import 'robot3/logging';
 import { action, createMachine, guard, immediate, reduce, state, transition, invoke } from "robot3";
 import { useMachine } from 'react-robot';
-import { wait } from "../utils";
+
+const wait = (ms: number) => () => new Promise(resolve => setTimeout(resolve, ms));
 
 interface useCarouselOptions {
     debug?: boolean;
@@ -14,11 +15,19 @@ interface Context {
     target: number;
     current: number;
     infinite: boolean;
-    prelaod: number;
+    preload: number;
     targetRef: any;
+    pos: {
+        // The current scroll
+        left: number;
+        top: number;
+        // Get the current mouse position
+        x: number;
+        y: number;
+    }
 }
 
-const _scrollTo = (n: number, sections, targetRef, options = {}) => {
+const _scrollTo = (n: number, sections: any[], targetRef: any, options = {}) => {
     // console.log(n, sections,targetRef.current)
     if (targetRef.current && n >= 0 && n < sections.length) {
         // log("go to item " + n)
@@ -26,25 +35,13 @@ const _scrollTo = (n: number, sections, targetRef, options = {}) => {
     }
 }
 
-const moveNext = (ctx, ev) => {
-    return { ...ctx, target: ctx.current + 1 }
-}
+const moveNext = (ctx: Context, ev: any) => ({ ...ctx, target: ctx.current + 1 })
+const movePrev = (ctx: Context, ev: any) => ({ ...ctx, target: ctx.current - 1 })
+const goPosEvent = (ctx: Context, ev: any) => ({ ...ctx, target: ev.value })
+const recalcPos = (ctx: Context, ev: any) => ({ ...ctx, target: ctx.current })
+const getConfig = (ctx: Context, ev: any) => ({ ...ctx, ...ev.value })
 
-const movePrev = (ctx, ev) => {
-    return { ...ctx, target: ctx.current - 1 }
-}
-
-const goPosEvent = (ctx, ev) => {
-    return { ...ctx, target: ev.value }
-}
-
-const recalcPos = (ctx, ev) => {
-    return { ...ctx, target: ctx.current }
-}
-
-const getConfig = (ctx, ev) => ({ ...ctx, ...ev.value })
-
-const scr = (ctx, ev) => {
+const scrollAction = (ctx: Context, ev: any) => {
     const sections = ctx.targetRef.current.children
 
     console.log(ctx)
@@ -53,12 +50,12 @@ const scr = (ctx, ev) => {
     return { ...ctx, current: ctx.target }
 }
 
-const checkTarget = (ctx: Context, ev) => {
+const checkTarget = (ctx: Context, ev: any) => {
     const sections = ctx.targetRef.current.children
 
     return ctx.target < 0 || ctx.target >= sections.length
 }
-const infiniteMode = (ctx, ev) => {
+const infiniteMode = (ctx: Context, ev: any) => {
     const sections = ctx.targetRef.current.children
 
     console.log(ctx)
@@ -78,7 +75,7 @@ const infiniteMode = (ctx, ev) => {
     return { ...ctx }
 }
 
-const getCurrent = (ctx, ev) => {
+const getCurrent = (ctx: Context, ev: any) => {
     const e = ev.value
     let current
 
@@ -101,7 +98,7 @@ const getCurrent = (ctx, ev) => {
     return { ...ctx, current }
 }
 
-const recalScroll = (ctx, ev) => {
+const recalScroll = (ctx: Context, ev: any) => {
     const e = ev.value
     const pos = ctx.pos
 
@@ -114,7 +111,7 @@ const recalScroll = (ctx, ev) => {
     e.currentTarget.scrollLeft = pos.left - dx;
 }
 
-const getPos = (ctx, ev) => {
+const getPos = (ctx: Context, ev: any) => {
     const e = ev.value
     return {
         ...ctx,
@@ -153,17 +150,24 @@ const scrollMachine = createMachine('idle', {
     ),
     goTarget: state(
         immediate('idle', guard(checkTarget)),
-        immediate('infinite', guard((ctx: Context, ev) => ctx.infinite), reduce(scr)),
-        immediate('idle', reduce(scr))
+        immediate('infinite', guard((ctx: Context, ev: any) => ctx.infinite), reduce(scrollAction)),
+        immediate('idle', reduce(scrollAction))
     ),
     infinite: invoke(wait(150),
         transition('done', 'idle', reduce(infiniteMode))
     )
-}, (initialContext) => ({
+}, (initialContext: Context) => ({
     targetRef: initialContext.targetRef,
     infinite: false,
     current: 0,
     target: 0,
+    preload: 0,
+    pos: {
+        left: 0,
+        top: 0,
+        x: 0,
+        y: 0,
+    }
 }))
 
 export const useCarousel = (options: useCarouselOptions = {}) => {
@@ -171,21 +175,9 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     const { debug = true } = options
     const log = debug ? console.log : (a: any) => null
 
-    // maybe if complexity grows (more 'flags') a FSM should be a good idea
-    const [infinite, setInfinite] = useState(false)
-    const [pressed, setPressed] = useState(false)
-    const [stopScrolling, setStopScrolling] = useState(false)
-
     const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
-
-    const [_current, setCurrent] = useState(0)
-    const [_preload, setPreload] = useState(1)
-    const current = infinite ? _current - 1 : _current
-
     const targetRef = useRef<any>(null)
-    const [pos, setPos] = useState({ top: 0, left: 0, x: 0, y: 0 })
-
-    const [c2, sendScroll, service] = useMachine(scrollMachine, { targetRef });
+    const [ctx, sendScroll, service] = useMachine(scrollMachine, { targetRef } as any);
 
     const handlers = {
         ref: targetRef, //BUG: this not resolve on refresh/cache/unmount, needs unmount logic? (?)
@@ -207,16 +199,14 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             sendScroll({ type: 'SCROLL', value: e })
 
             // Clear our timeout throughout the scroll
-            clearTimeout(scrollingTimer.s);
+            clearTimeout(scrollingTimer.s as any);
 
             // Set a timeout to run after scrolling ends
-            setScrollingTimer({
-                s: setTimeout(function () {
-                    // Run the callback
-                    // if (c1.name != 'pressed')
-                    sendScroll('SCROLL_OUT')
-                }, 66)
-            })
+            setTimeout(function () {
+                // Run the callback
+                // if (c1.name != 'pressed')
+                sendScroll('SCROLL_OUT')
+            }, 66)
         },
     }
 
@@ -269,7 +259,6 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
                     preload
                 }
             })
-            const sections = targetRef?.current?.children
             sendScroll({
                 type: 'GO',
                 value: preload,
@@ -279,5 +268,6 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
         return slidesWithClones
     }
 
+    const current = ctx.context.infinite ? ctx.context.current - ctx.context.preload : ctx.context.current
     return { handlers, current, scrollTo, useInfinite, scrollNext, scrollPrev }
 }
