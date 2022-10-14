@@ -1,12 +1,21 @@
 import React, { useEffect, useRef, useState } from "react"
 import animateScrollTo from 'animated-scroll-to';
-import 'robot3/debug';
+// import 'robot3/debug';
 import 'robot3/logging';
-import { action, createMachine, immediate, reduce, state, transition } from "robot3";
+import { action, createMachine, guard, immediate, reduce, state, transition, invoke } from "robot3";
 import { useMachine } from 'react-robot';
+import { wait } from "../utils";
 
 interface useCarouselOptions {
     debug?: boolean;
+}
+
+interface Context {
+    target: number;
+    current: number;
+    infinite: boolean;
+    prelaod: number;
+    targetRef: any;
 }
 
 const _scrollTo = (n: number, sections, targetRef, options = {}) => {
@@ -33,9 +42,40 @@ const recalcPos = (ctx, ev) => {
     return { ...ctx, target: ctx.current }
 }
 
+const getConfig = (ctx, ev) => ({ ...ctx, ...ev.value })
+
 const scr = (ctx, ev) => {
     const sections = ctx.targetRef.current.children
-    _scrollTo(ctx.target, sections, ctx.targetRef)
+
+    console.log(ctx)
+    _scrollTo(ctx.target, sections, ctx.targetRef, ev.options || {})
+
+    return { ...ctx, current: ctx.target }
+}
+
+const checkTarget = (ctx: Context, ev) => {
+    const sections = ctx.targetRef.current.children
+
+    return ctx.target < 0 || ctx.target >= sections.length
+}
+const infiniteMode = (ctx, ev) => {
+    const sections = ctx.targetRef.current.children
+
+    console.log(ctx)
+    if (ctx.target == sections.length - ctx.preload - (ctx.preload <= 3 ? 0 : 2)) {
+        const newTarget = ctx.preload - (ctx.preload <= 3 ? 0 : 2)
+        console.log('go init: ', newTarget)
+        _scrollTo(newTarget, sections, ctx.targetRef, { maxDuration: 0, minDuration: 0 })
+        return { ...ctx, current: newTarget }
+    }
+
+    if (ctx.target == (ctx.preload <= 3 ? 0 : 1)) {
+        const newTarget = sections.length - 2 * ctx.preload + (ctx.preload <= 3 ? 0 : 1)
+        console.log('go end: ', newTarget)
+        _scrollTo(newTarget, sections, ctx.targetRef, { maxDuration: 0, minDuration: 0 })
+        return { ...ctx, current: newTarget }
+    }
+    return { ...ctx }
 }
 
 const getCurrent = (ctx, ev) => {
@@ -52,6 +92,7 @@ const getCurrent = (ctx, ev) => {
 
         // Check if the point we found falls within the section
         if (relativePos >= 0 && relativePos > (sections[i].offsetWidth / 2)) {
+            console.log('current: ', i)
             current = i
             break;
         }
@@ -90,6 +131,7 @@ const getPos = (ctx, ev) => {
 
 const scrollMachine = createMachine('idle', {
     idle: state(
+        transition('CONFIG', 'idle', reduce(getConfig)),
         transition('SCROLL', 'scrollMode', reduce(getCurrent)),
         transition('PREV', 'goTarget', reduce(movePrev)),
         transition('NEXT', 'goTarget', reduce(moveNext)),
@@ -110,15 +152,23 @@ const scrollMachine = createMachine('idle', {
         immediate('goTarget', reduce(recalcPos))
     ),
     goTarget: state(
-        immediate('idle', action(scr))
+        immediate('idle', guard(checkTarget)),
+        immediate('infinite', guard((ctx: Context, ev) => ctx.infinite), reduce(scr)),
+        immediate('idle', reduce(scr))
+    ),
+    infinite: invoke(wait(150),
+        transition('done', 'idle', reduce(infiniteMode))
     )
 }, (initialContext) => ({
     targetRef: initialContext.targetRef,
+    infinite: false,
+    current: 0,
+    target: 0,
 }))
 
 export const useCarousel = (options: useCarouselOptions = {}) => {
 
-    const { debug = false } = options
+    const { debug = true } = options
     const log = debug ? console.log : (a: any) => null
 
     // maybe if complexity grows (more 'flags') a FSM should be a good idea
@@ -135,29 +185,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     const targetRef = useRef<any>(null)
     const [pos, setPos] = useState({ top: 0, left: 0, x: 0, y: 0 })
 
-    useEffect(() => {
-        log("current " + current)
-
-        if (infinite && !pressed) {
-            const sections = targetRef.current.children
-            if (_current == sections.length - 2 * _preload + 1) {
-                log('go init')
-                setTimeout(() => {
-                    _scrollTo(1, sections, { maxDuration: 0, minDuration: 0 })
-                }, 100)
-            }
-
-            if (_current == 0) {
-                log('go end')
-                setTimeout(() => {
-                    _scrollTo(sections.length - 2 * _preload, sections, { maxDuration: 0, minDuration: 0 })
-                }, 100)
-            }
-
-        }
-    }, [_current, pressed])
-
-    const [c2, sendScroll] = useMachine(scrollMachine, { targetRef });
+    const [c2, sendScroll, service] = useMachine(scrollMachine, { targetRef });
 
     const handlers = {
         ref: targetRef, //BUG: this not resolve on refresh/cache/unmount, needs unmount logic? (?)
@@ -207,7 +235,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     // TODO: support generator function
     // type Interatorfn = (current: number, active: boolean) => React.ReactNode
     // const [iteratorFn, setInteratorFn] = useState<{ fn: Interatorfn }>({ fn: (c, a) => null })
-    // const [_preload, setPreload] = useState(0)
+    // const getConfig[_preload, setPreload] = useState(0)
     // const useInfinite = (fn: Interatorfn, preload: number = 1): React.ReactNode[] => {
     //     useEffect(() => {
     //         const sects = range(preload).map((i) => fn(i, current == i))
@@ -223,17 +251,30 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     // }
 
     const useInfinite = (slides: React.ReactNode[], preload = 1): React.ReactNode[] => {
+
+        if (preload > slides.length) {
+            throw "no enought items to preload in slides"
+        }
         const slidesWithClones = [...slides]
         slidesWithClones.unshift(...slidesWithClones.slice(slidesWithClones.length - preload, slidesWithClones.length))
         slidesWithClones.push(...slidesWithClones.slice(preload, 2 * preload))
 
         useEffect(() => {
             log('infinite mode')
-            setInfinite(true)
-            setPreload(preload)
-            const sections = targetRef?.current?.children
 
-            _scrollTo(preload, sections, { maxDuration: 0, minDuration: 0 })
+            sendScroll({
+                type: 'CONFIG',
+                value: {
+                    infinite: true,
+                    preload
+                }
+            })
+            const sections = targetRef?.current?.children
+            sendScroll({
+                type: 'GO',
+                value: preload,
+                options: { maxDuration: 0, minDuration: 0 }
+            })
         }, [])
         return slidesWithClones
     }

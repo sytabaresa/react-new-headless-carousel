@@ -15,3 +15,5 @@ export function range(...e) {
     }
     return a;
 }
+
+export const wait = ms => () => new Promise(resolve => setTimeout(resolve, ms));

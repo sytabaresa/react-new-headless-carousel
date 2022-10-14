@@ -32,7 +32,7 @@ function CarouselStory() {
         </div>
     )
 
-    const slides = useInfinite(items, 6)
+    const slides = useInfinite(items, 4)
 
 
     return (
