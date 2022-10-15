@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react"
 import animateScrollTo from 'animated-scroll-to';
 // import 'robot3/debug';
-// import 'robot3/logging';
+import 'robot3/logging';
 import { action, createMachine, guard, immediate, reduce, state, transition, invoke } from "robot3";
 import { useMachine } from 'react-robot';
 
@@ -47,7 +47,7 @@ const scrollAction = (ctx: Context, ev: any) => {
     console.log(ctx)
     _scrollTo(ctx.target, sections, ctx.targetRef, ev.options || {})
 
-    return { ...ctx, current: ctx.target }
+    return { ...ctx }
 }
 
 const checkTarget = (ctx: Context, ev: any) => {
@@ -55,29 +55,35 @@ const checkTarget = (ctx: Context, ev: any) => {
 
     return ctx.target < 0 || ctx.target >= sections.length
 }
+
+
+const checktSyncTargetCurrent = (ctx: Context, ev: any) => {
+    return ctx.current == ctx.target
+}
+
 const infiniteMode = (ctx: Context, ev: any) => {
     const sections = ctx.targetRef.current.children
 
     console.log(ctx)
-    if (ctx.target == sections.length - ctx.preload - (ctx.preload <= 3 ? 0 : 2)) {
+    if (ctx.target >= sections.length - ctx.preload - (ctx.preload <= 3 ? 0 : 2)) {
         const newTarget = ctx.preload - (ctx.preload <= 3 ? 0 : 2)
         console.log('go init: ', newTarget)
         _scrollTo(newTarget, sections, ctx.targetRef, { maxDuration: 0, minDuration: 0 })
-        return { ...ctx, current: newTarget }
+        return { ...ctx, target: newTarget }
     }
 
-    if (ctx.target == (ctx.preload <= 3 ? 0 : 1)) {
+    if (ctx.target <= (ctx.preload <= 3 ? 0 : 1)) {
         const newTarget = sections.length - 2 * ctx.preload + (ctx.preload <= 3 ? 0 : 1)
         console.log('go end: ', newTarget)
         _scrollTo(newTarget, sections, ctx.targetRef, { maxDuration: 0, minDuration: 0 })
-        return { ...ctx, current: newTarget }
+        return { ...ctx, target: newTarget }
     }
     return { ...ctx }
 }
 
 const getCurrent = (ctx: Context, ev: any) => {
     const e = ev.value
-    let current
+    let current = ctx.current
 
     // Grab the position yo are scrolled to (the top of the viewport)
     let posLeft = e.currentTarget.scrollLeft;
@@ -129,7 +135,8 @@ const getPos = (ctx: Context, ev: any) => {
 const scrollMachine = createMachine('idle', {
     idle: state(
         transition('CONFIG', 'idle', reduce(getConfig)),
-        transition('SCROLL', 'scrollMode', reduce(getCurrent)),
+        transition('SCROLL', 'scrollMode', guard(checktSyncTargetCurrent), reduce(getCurrent)),
+        transition('SCROLL', 'idle', reduce(getCurrent)),
         transition('PREV', 'goTarget', reduce(movePrev)),
         transition('NEXT', 'goTarget', reduce(moveNext)),
         transition('GO', 'goTarget', reduce(goPosEvent)),
@@ -153,7 +160,7 @@ const scrollMachine = createMachine('idle', {
         immediate('infinite', guard((ctx: Context, ev: any) => ctx.infinite), reduce(scrollAction)),
         immediate('idle', reduce(scrollAction))
     ),
-    infinite: invoke(wait(150),
+    infinite: invoke(wait(50),
         transition('done', 'idle', reduce(infiniteMode))
     )
 }, (initialContext: Context) => ({
@@ -175,7 +182,7 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
     const { debug = true } = options
     const log = debug ? console.log : (a: any) => null
 
-    const [scrollingTimer, setScrollingTimer] = useState({ s: null, stop: false })
+    const [scrollingTimer, setScrollingTimer] = useState({ s: null as any })
     const targetRef = useRef<any>(null)
     const [ctx, sendScroll, service] = useMachine(scrollMachine, { targetRef } as any);
 
@@ -202,11 +209,13 @@ export const useCarousel = (options: useCarouselOptions = {}) => {
             clearTimeout(scrollingTimer.s as any);
 
             // Set a timeout to run after scrolling ends
-            setTimeout(function () {
-                // Run the callback
-                // if (c1.name != 'pressed')
-                sendScroll('SCROLL_OUT')
-            }, 66)
+            setScrollingTimer({
+                s: setTimeout(function () {
+                    // Run the callback
+                    // if (c1.name != 'pressed')
+                    sendScroll('SCROLL_OUT')
+                }, 66)
+            })
         },
     }
 
